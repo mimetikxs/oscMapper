@@ -41,6 +41,13 @@ void OscController::setup(int port){
 void OscController::addPanel(ofxPanel* panel){
     addGroup(panel);
     panels.push_back(panel);
+    
+    // testing: parameter sync
+    // a group can only have one parent
+    // see: https://github.com/openframeworks/openFrameworks/issues/3104
+    //ofParameterGroup & group = (ofParameterGroup&) panel->getParameter();
+    //cout << group.getParent() << endl;
+    //ofAddListener(group.parameterChangedE, this, &OscController::parameterChanged);
 }
 
 
@@ -50,12 +57,12 @@ void OscController::addGroup(ofxGuiGroup* group){
         ofxBaseGui* control = group->getControl(i);
         
         if(isGroup(control->getParameter())){
+            
             ofxGuiGroup* group = dynamic_cast<ofxGuiGroup*>(control);
             addGroup(group);
-        }
-        
-        else if(isMappeable(control->getParameter())){
-        
+            
+        }else if(isMappeable(control->getParameter())){
+            
             string controlName = control->getName();
             if(controlsNameCount.find(controlName) == controlsNameCount.end()) {
                 // this name hasn't been added yet, init counter
@@ -448,4 +455,53 @@ void OscController::drawOverlay(ofxBaseGui *control, ofColor fillColor, ofColor 
     //ofNoFill();
     //ofSetColor(lineColor);
     //ofRect(r);
+}
+
+
+
+
+void OscController::enableParameterSync(){
+    // we need this because a group can only have one parent
+    // because the parent of this parameter might not be
+    // the panel group, we need to find the current parent.
+    // with multiple parents we could just have added the listener to the panel.
+    
+    // iterate through the stored controls
+    for(map<string,ofxBaseGui*>::iterator it=controls.begin(); it!=controls.end(); ++it){
+        ofxBaseGui* control = it->second;
+
+        // what is the last parent of this param?
+        ofParameterGroup* parent = control->getParameter().getParent();
+        while(parent->getParent()){
+            parent = parent->getParent();
+        }
+        // add listener to this group only if it wasn't added before
+        if(syncGroups.find(parent->getName()) == syncGroups.end()){
+            cout << parent->getName() << endl;
+            ofAddListener(parent->parameterChangedE, this, &OscController::parameterChanged);
+            syncGroups[ parent->getName() ] = parent;
+        }
+    }
+}
+
+
+void OscController::disableParameterSync(){
+    for(map<string,ofParameterGroup*>::iterator it=syncGroups.begin(); it!=syncGroups.end(); ++it){
+        ofParameterGroup* group = it->second;
+        ofAddListener(group->parameterChangedE, this, &OscController::parameterChanged);
+    }
+    syncGroups.clear();
+}
+
+
+void OscController::parameterChanged(ofAbstractParameter & parameter){
+    cout << parameter.getName() << endl;
+//    string address = "";
+//    const vector<string> hierarchy = parameter.getGroupHierarchyNames();
+//    for(int i=0;i<(int)hierarchy.size()-1;i++){
+//        address+= "/" + hierarchy[i];
+//    }
+//    if(address.length()) address += "/";
+//    
+//    cout << address << endl;
 }

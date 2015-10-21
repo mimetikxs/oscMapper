@@ -33,8 +33,10 @@ public:
     void disable();
     bool isEnabled(){ return bEnabled; }
     
-    // test: echo incomming messages to these
+    // TODO:
     //void addOutput(string host, int port);
+    void enableParameterSync();
+    void disableParameterSync();
     
 private:
     
@@ -71,4 +73,13 @@ private:
     bool isMappeable(ofAbstractParameter& p);
     bool matchTypes(string controlName, ofxOscMessage message);
     string mismatchMessage;
+    
+    
+    // parameter syncing
+    
+    // found groups, we use a map to avoid storing the same group twice
+    map<string,ofParameterGroup*> syncGroups;
+    
+    void parameterChanged( ofAbstractParameter & parameter );
 };
+

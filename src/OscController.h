@@ -37,6 +37,8 @@ public:
     //void addOutput(string host, int port);
     void enableParameterSync();
     void disableParameterSync();
+    void toggleParameterSync();
+    bool isParameterSyncEnabled();
     
 private:
     
@@ -56,8 +58,9 @@ private:
     map<string, string> addressToName;
     
     ofxOscReceiver oscIn;
-    //ofxOscSender oscOut;
-    vector<ofxOscSender*> oscOut;
+    ofxOscSender senderVezer;       // forward osc messages for recording
+    ofxOscSender senderTouchOSC;    // send osc messages to sync touchOsc with gui controls
+    //vector<ofxOscSender*> oscOut;
     
     void draw(ofEventArgs& args);
     void update(ofEventArgs& args);
@@ -75,11 +78,24 @@ private:
     string mismatchMessage;
     
     
+    ////////////////////////////////////////
     // parameter syncing
     
-    // found groups, we use a map to avoid storing the same group twice
-    map<string,ofParameterGroup*> syncGroups;
+    bool bParamenterSyncEnabled;
     
-    void parameterChanged( ofAbstractParameter & parameter );
+    // use name of a parameter to get its address
+    map<string,string> paramNameToAddress;
+    
+    map<string,ofParameterGroup*> lastParents;
+    
+    void parameterChanged(ofAbstractParameter & parameter);
+    
+    //string getParameterAddress(ofAbstractParameter & parameter);
+    
+    string getParameterName(ofAbstractParameter & parameter);
+    
+    string getAddressByControlName(string controlName);
+    
+    string getAddressByParamName(string paramName);
 };
 

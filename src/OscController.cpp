@@ -13,6 +13,7 @@ OscController::OscController(){
     bMapModeEnabled = false;
     bEnabled = false;
     selected = "";
+    bParamenterSyncEnabled = false;
 }
 
 
@@ -24,14 +25,17 @@ void OscController::setup(int port){
     
     // testing osc forwarding (aka osc echo)
     // local echo to vezer
-    ofxOscSender* senderVezer = new ofxOscSender();
-    senderVezer->setup("localhost", 9000);
-    // remote echo to touchOsc
-    ofxOscSender* senderTouchOSC = new ofxOscSender();
-    senderTouchOSC->setup("169.254.39.22", 7000);
+//    ofxOscSender* senderVezer = new ofxOscSender();
+//    senderVezer->setup("localhost", 9000);
+//    // remote echo to touchOsc
+//    ofxOscSender* senderTouchOSC = new ofxOscSender();
+//    senderTouchOSC->setup("169.254.39.22", 7000);
+//    
+//    oscOut.push_back(senderVezer);
+//    oscOut.push_back(senderTouchOSC);
     
-    oscOut.push_back(senderVezer);
-    oscOut.push_back(senderTouchOSC);
+    senderVezer.setup("localhost", 9000);
+    senderTouchOSC.setup("169.254.39.22", 7000);
     
     enable();
 }
@@ -135,9 +139,9 @@ void OscController::update(ofEventArgs &args){
                 
                 // test: echo the message
                 // note that only messages mapped to a control are forwarded
-                for (int i = 0; i < oscOut.size(); i++) {
-                    oscOut[i]->sendMessage(m);
-                }
+//                for (int i = 0; i < oscOut.size(); i++) {
+//                    oscOut[i]->sendMessage(m);
+//                }
                 
                 
                 string paramName = addressToName[address];
@@ -459,8 +463,27 @@ void OscController::drawOverlay(ofxBaseGui *control, ofColor fillColor, ofColor 
 
 
 
+bool OscController::isParameterSyncEnabled(){
+    return bParamenterSyncEnabled;
+}
+
+
+void OscController::toggleParameterSync(){
+    if(bParamenterSyncEnabled){
+        disableParameterSync();
+    }else{
+        enableParameterSync();
+    }
+}
+
+
 
 void OscController::enableParameterSync(){
+    if(bParamenterSyncEnabled){
+        return;
+    }
+    bParamenterSyncEnabled = true;
+    
     // we need this because a group can only have one parent
     // because the parent of this parameter might not be
     // the panel group, we need to find the current parent.
@@ -468,40 +491,106 @@ void OscController::enableParameterSync(){
     
     // iterate through the stored controls
     for(map<string,ofxBaseGui*>::iterator it=controls.begin(); it!=controls.end(); ++it){
+        string controlName = it->first;
         ofxBaseGui* control = it->second;
-
+        string oscAddress = getAddressByControlName(controlName);
+        ofAbstractParameter& parameter = control->getParameter();
+        
+        // if this control is mapped to an address, create a link between
+        // the parameter name and the osc address
+        if(oscAddress != ""){
+            string paramName = getParameterName(parameter);
+            paramNameToAddress[paramName] = oscAddress;
+        }
+        
         // what is the last parent of this param?
-        ofParameterGroup* parent = control->getParameter().getParent();
-        while(parent->getParent()){
-            parent = parent->getParent();
+        ofParameterGroup* lastParent = parameter.getParent();
+        while(lastParent->getParent()){
+            lastParent = lastParent->getParent();
         }
-        // add listener to this group only if it wasn't added before
-        if(syncGroups.find(parent->getName()) == syncGroups.end()){
-            cout << parent->getName() << endl;
-            ofAddListener(parent->parameterChangedE, this, &OscController::parameterChanged);
-            syncGroups[ parent->getName() ] = parent;
-        }
+        lastParents[ lastParent->getName() ] = lastParent; // use a map to store the lastParent of the parameter
+    }
+    
+    // add listerner
+    for(map<string,ofParameterGroup*>::iterator it=lastParents.begin(); it!=lastParents.end(); ++it){
+        ofParameterGroup* lastParent = it->second;
+        cout << lastParent->getName() << endl;
+        ofAddListener(lastParent->parameterChangedE, this, &OscController::parameterChanged);
     }
 }
 
 
 void OscController::disableParameterSync(){
-    for(map<string,ofParameterGroup*>::iterator it=syncGroups.begin(); it!=syncGroups.end(); ++it){
-        ofParameterGroup* group = it->second;
-        ofAddListener(group->parameterChangedE, this, &OscController::parameterChanged);
+    if(!bParamenterSyncEnabled){
+        return;
     }
-    syncGroups.clear();
+    bParamenterSyncEnabled = false;
+    
+    for(map<string,ofParameterGroup*>::iterator it=lastParents.begin(); it!=lastParents.end(); ++it){
+        ofParameterGroup* lastParent = it->second;
+        ofRemoveListener(lastParent->parameterChangedE, this, &OscController::parameterChanged);
+    }
+    lastParents.clear();
 }
 
 
 void OscController::parameterChanged(ofAbstractParameter & parameter){
-    cout << parameter.getName() << endl;
-//    string address = "";
-//    const vector<string> hierarchy = parameter.getGroupHierarchyNames();
-//    for(int i=0;i<(int)hierarchy.size()-1;i++){
-//        address+= "/" + hierarchy[i];
+    string paramName = getParameterName(parameter);
+    string address = getAddressByParamName(paramName);
+    
+    if(address == ""){
+        return;
+    }
+    
+    ofxOscMessage msg;
+    msg.setAddress(address);
+    
+    // NOTE: all parameters are sent as float args
+    if(parameter.type()==typeid(ofParameter<int>).name()){
+        msg.addFloatArg(parameter.cast<int>());
+    }else if(parameter.type()==typeid(ofParameter<float>).name()){
+        msg.addFloatArg(parameter.cast<float>());
+    }else if(parameter.type()==typeid(ofParameter<bool>).name()){
+        msg.addFloatArg(parameter.cast<bool>());
+    }
+    
+    // send message
+//    for (int i = 0; i < oscOut.size(); i++) {
+//        oscOut[i]->sendMessage(msg);
 //    }
-//    if(address.length()) address += "/";
-//    
-//    cout << address << endl;
+    
+    senderTouchOSC.sendMessage(msg);
+}
+
+
+string OscController::getParameterName(ofAbstractParameter &parameter){
+    string paramName = "";
+    const vector<string> hierarchy = parameter.getGroupHierarchyNames();
+    for(int i=0; i<(int)hierarchy.size()-1; i++){
+        paramName += hierarchy[i] + ".";
+    }
+    paramName += parameter.getEscapedName();
+
+    return paramName;
+}
+
+
+string OscController::getAddressByControlName(string controlName){
+    string address = "";
+    for(map<string,string>::iterator it=addressToName.begin(); it!=addressToName.end(); ++it){
+        if(it->second == controlName){
+            address = it->first;
+            break;
+        }
+    }
+    return address;
+}
+
+
+string OscController::getAddressByParamName(string paramName){
+    string address = "";
+    if(paramNameToAddress.find(paramName) != paramNameToAddress.end()){
+        address = paramNameToAddress[paramName];
+    }
+    return address;
 }

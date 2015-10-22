@@ -35,7 +35,8 @@ void OscController::setup(int port){
 //    oscOut.push_back(senderTouchOSC);
     
     senderVezer.setup("localhost", 9000);
-    senderTouchOSC.setup("169.254.39.22", 7000);
+    //senderTouchOSC.setup("169.254.39.22", 7000);
+    senderTouchOSC.setup("169.254.253.212", 7000);
     
     enable();
 }
@@ -143,6 +144,8 @@ void OscController::update(ofEventArgs &args){
 //                    oscOut[i]->sendMessage(m);
 //                }
                 
+                // use this to record incomming messages with vezer
+                senderVezer.sendMessage(m);
                 
                 string paramName = addressToName[address];
                 ofAbstractParameter& parameter = controls[paramName]->getParameter();
@@ -160,19 +163,24 @@ void OscController::update(ofEventArgs &args){
                         parameter.cast<int>() = m.getArgAsInt32(0);
                     }
                     else if(m.getArgType(0) == OFXOSC_TYPE_FLOAT){
-                        //ofParameter<float> & param = (ofParameter<float> &)parameters.get(paramName);
-                        //param = m.getArgAsFloat(i);
-                        parameter.cast<float>() = m.getArgAsFloat(0);
+                        //parameter.cast<float>() = m.getArgAsFloat(0);
                         
                         ////////////////////////////////////////////////////////////////
                         // testing:
-                        // float to bool (0.0 = false, 1.0 = true)
-                        if(parameter.type() == typeid(ofParameter<bool>).name()){
-                            parameter.cast<bool>() = m.getArgAsFloat(0);
+                        float value = m.getArgAsFloat(0);
+                        
+                        if(parameter.type() == typeid(ofParameter<float>).name()){
+                            ofParameter<float> & p = parameter.cast<float>();
+                            p = ofMap(value, 0.0, 1.0, p.getMin(), p.getMax());
                         }
                         // float to int
                         else if(parameter.type() == typeid(ofParameter<int>).name()){
-                            parameter.cast<int>() = m.getArgAsFloat(0);
+                            ofParameter<int> & p = parameter.cast<int>();
+                            p = ofMap(value, 0.0, 1.0, p.getMin(), p.getMax());
+                        }
+                        // float to bool (0.0 = false, 1.0 = true)
+                        else if(parameter.type() == typeid(ofParameter<bool>).name()){
+                            parameter.cast<bool>() = value;
                         }
                         ////////////////////////////////////////////////////////////////
                     }
@@ -547,9 +555,13 @@ void OscController::parameterChanged(ofAbstractParameter & parameter){
     
     // NOTE: all parameters are sent as float args
     if(parameter.type()==typeid(ofParameter<int>).name()){
-        msg.addFloatArg(parameter.cast<int>());
+        //msg.addFloatArg(parameter.cast<int>());
+        ofParameter<int> & p = parameter.cast<int>();
+        msg.addFloatArg( ofMap(p.get(), p.getMin(), p.getMax(), 0.0, 1.0) );
     }else if(parameter.type()==typeid(ofParameter<float>).name()){
-        msg.addFloatArg(parameter.cast<float>());
+        //msg.addFloatArg(parameter.cast<float>());
+        ofParameter<float> & p = parameter.cast<float>();
+        msg.addFloatArg( ofMap(p.get(), p.getMin(), p.getMax(), 0.0, 1.0) );
     }else if(parameter.type()==typeid(ofParameter<bool>).name()){
         msg.addFloatArg(parameter.cast<bool>());
     }

@@ -36,7 +36,7 @@ void OscController::setup(int port){
     
     senderVezer.setup("localhost", 9000);
     //senderTouchOSC.setup("169.254.39.22", 7000);
-    senderTouchOSC.setup("169.254.253.212", 7000);
+    //senderTouchOSC.setup("169.254.253.212", 7000);
     
     enable();
 }
@@ -145,7 +145,7 @@ void OscController::update(ofEventArgs &args){
 //                }
                 
                 // use this to record incomming messages with vezer
-                senderVezer.sendMessage(m);
+                //senderVezer.sendMessage(m);
                 
                 string paramName = addressToName[address];
                 ofAbstractParameter& parameter = controls[paramName]->getParameter();
@@ -571,7 +571,8 @@ void OscController::parameterChanged(ofAbstractParameter & parameter){
 //        oscOut[i]->sendMessage(msg);
 //    }
     
-    senderTouchOSC.sendMessage(msg);
+    //senderTouchOSC.sendMessage(msg);
+    senderVezer.sendMessage(msg);
 }
 
 

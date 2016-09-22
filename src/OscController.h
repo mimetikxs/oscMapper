@@ -59,7 +59,7 @@ private:
     
     ofxOscReceiver oscIn;
     ofxOscSender senderVezer;       // forward osc messages for recording
-    ofxOscSender senderTouchOSC;    // send osc messages to sync touchOsc with gui controls
+    //ofxOscSender senderTouchOSC;    // send osc messages to sync touchOsc with gui controls
     //vector<ofxOscSender*> oscOut;
     
     void draw(ofEventArgs& args);
